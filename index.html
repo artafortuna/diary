@@ -135,9 +135,8 @@
         </div>
     </div>
 
-    <!-- SCRIPT UTAMA FULL ANTI-CRASH & DATA RECOVERY -->
     <script>
-    (function() {
+    (async function() {
         // STATE UTAMA
         window.diaryData = [];
         window.editId = null;
@@ -174,7 +173,7 @@
             });
         });
 
-        // 3. SET DEFAULT TANGGAL & JAM KE WAKTU SEKARANG
+        // 3. SET DEFAULT TANGGAL & JAM
         const setDateTimeToNow = () => {
             const tglInput = document.getElementById('tgl_input');
             const jamInput = document.getElementById('jam_input');
@@ -189,14 +188,14 @@
         };
         setDateTimeToNow();
 
-        // 4. CUSTOM POPUP (ALERT & CONFIRM) BERTEMA WEBSITE
+        // 4. CUSTOM POPUP (ALERT & CONFIRM)
         window.showAlert = (title, message) => {
             const alertEl = document.getElementById('customAlert');
             if(alertEl) {
                 document.getElementById('alertTitle').textContent = title;
                 document.getElementById('alertMessage').textContent = message;
                 alertEl.classList.add('show');
-            } else { alert(message); } // Fallback aman
+            } else { alert(message); }
         };
         const alertOkBtn = document.getElementById('alertOkBtn');
         if(alertOkBtn) alertOkBtn.addEventListener('click', () => document.getElementById('customAlert').classList.remove('show'));
@@ -220,7 +219,7 @@
             newCancelBtn.addEventListener('click', () => confirmModal.classList.remove('show'));
         };
 
-        // 5. UPLOAD FOTO (ANTI CRASH)
+        // 5. UPLOAD FOTO 
         const fotoInput = document.getElementById('foto');
         const imgPreview = document.getElementById('imgPreview');
         const uploadPlaceholder = document.getElementById('uploadPlaceholder');
@@ -297,7 +296,7 @@
                         <span class="entry-meta"><i class="far fa-calendar-alt"></i> ${tanggalCantik}</span>
                         <span class="badge">${item.kategori || ''}</span>
                     </div>
-                    ${item.foto ? `<img src="${item.foto}" class="entry-image" onclick="openLightbox('${item.foto}')" style="object-fit:cover; height:120px; border-radius:8px; margin-bottom:10px; cursor:zoom-in;">` : ''}
+                    ${item.foto ? `<img src="${item.foto}" class="entry-image" onclick="openLightbox('${item.foto}')" style="object-fit:cover; height:150px; border-radius:8px; margin-bottom:10px; cursor:zoom-in;">` : ''}
                     <div class="entry-text" style="font-size:0.95rem; margin-bottom:10px; white-space:pre-wrap;">${item.catatan || ''}</div>
                     ${item.lokasi ? `<div class="entry-location" style="font-size:0.78rem; color:var(--secondary); margin-bottom:10px;"><i class="fas fa-map-marker-alt"></i> ${item.lokasi}</div>` : ''}
                     <div class="entry-actions" style="display:flex; justify-content:flex-end; gap:8px; border-top:1px dashed var(--border-color); padding-top:10px;">
@@ -309,9 +308,68 @@
             });
         };
 
-        // 8. DATABASE & PENYELAMAT DATA LAMA (GANDA)
-        const initDB = () => {
-            const req = indexedDB.open("RuangCeritaDB", 3); // Paksa buat db jika stuck
+        // =========================================================================
+        // 8. SISTEM RECOVERY SUPER AGRESIF (PENYELAMAT SEMUA DATA LAMA)
+        // =========================================================================
+        async function salvageData() {
+            let recovered = [];
+
+            // Bongkar LocalStorage
+            try {
+                const ls = JSON.parse(localStorage.getItem('diary_entries'));
+                if (Array.isArray(ls)) recovered = recovered.concat(ls);
+            } catch(e) {}
+
+            // Fungsi Pembongkar IndexedDB
+            const extractDB = (dbName) => {
+                return new Promise((resolve) => {
+                    const req = indexedDB.open(dbName);
+                    req.onsuccess = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains("ceritaStore")) { resolve([]); return; }
+                        try {
+                            const tx = db.transaction(["ceritaStore"], "readonly");
+                            const store = tx.objectStore("ceritaStore");
+                            const getReq = store.getAll();
+                            getReq.onsuccess = () => resolve(getReq.result || []);
+                            getReq.onerror = () => resolve([]);
+                        } catch(err) { resolve([]); }
+                    };
+                    req.onerror = () => resolve([]);
+                });
+            };
+
+            // Bongkar SEMUA database yang pernah kita bikin tadi!
+            const dbData1 = await extractDB("RuangCeritaDB");
+            const dbData2 = await extractDB("RuangCeritaDB_Final");
+            const dbData3 = await extractDB("RuangCeritaDB_V2");
+
+            recovered = recovered.concat(dbData1, dbData2, dbData3);
+
+            // Saring Data Ganda & Urutkan
+            const map = new Map();
+            recovered.forEach(item => {
+                if (item && item.id) map.set(item.id, item);
+            });
+            let finalData = Array.from(map.values());
+            finalData.sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
+
+            return finalData;
+        }
+
+        // INIT APLIKASI
+        async function initApp() {
+            // 1. Sedot semua data yang hilang!
+            window.diaryData = await salvageData();
+
+            // 2. Tampilkan di layar
+            renderDiary();
+
+            // 3. Simpan permanen ulang ke LocalStorage sebagai backup abadi
+            try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(e){}
+
+            // 4. Buka Database Utama yang benar
+            const req = indexedDB.open("RuangCeritaDB", 1);
             req.onupgradeneeded = (e) => {
                 window.db = e.target.result;
                 if (!window.db.objectStoreNames.contains("ceritaStore")) {
@@ -320,34 +378,14 @@
             };
             req.onsuccess = (e) => {
                 window.db = e.target.result;
-                
-                // SELAMATKAN SEMUA DATA LAMA DARI LOCALSTORAGE
-                let localData = [];
-                try { localData = JSON.parse(localStorage.getItem('diary_entries')) || []; } catch(err){}
-                
-                const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                const store = tx.objectStore("ceritaStore");
-                
-                // Suntik data lama ke IndexedDB
-                localData.forEach(item => store.put(item));
-                
-                const getReq = store.getAll();
-                getReq.onsuccess = () => {
-                    window.diaryData = (getReq.result || []).sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
-                    // Tulis balik ke LocalStorage sebagai Backup Permanen!
-                    try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
-                    renderDiary();
-                };
-            };
-            req.onerror = () => {
-                // JIKA INDEXEDDB DIBLOKIR BROWSER, PAKAI LOCALSTORAGE SAJA
+                // Masukkan kembali semua data ke Database yang benar
                 try {
-                    window.diaryData = JSON.parse(localStorage.getItem('diary_entries')) || [];
-                    window.diaryData.sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
-                    renderDiary();
-                } catch(e){}
+                    const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                    const store = tx.objectStore("ceritaStore");
+                    window.diaryData.forEach(item => store.put(item));
+                } catch(err) {}
             };
-        };
+        }
 
         // 9. SUBMIT FORM
         const form = document.getElementById('diaryForm');
@@ -365,18 +403,18 @@
                     foto: window.base64ImageStr
                 };
 
-                // Update Array Memory
+                // Update Data Memory
                 window.diaryData = window.diaryData.filter(d => d.id !== dataMomen.id);
                 window.diaryData.push(dataMomen);
                 window.diaryData.sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
                 
-                // BACKUP 1: Simpan ke LocalStorage
+                // BACKUP GANDA BIAR GAK HILANG LAGI
                 try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
-
-                // BACKUP 2: Simpan ke IndexedDB
                 if(window.db) {
-                    const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                    tx.objectStore("ceritaStore").put(dataMomen);
+                    try {
+                        const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                        tx.objectStore("ceritaStore").put(dataMomen);
+                    } catch(err) {}
                 }
 
                 resetForm();
@@ -408,11 +446,14 @@
         window.deleteEntry = (id) => {
             showConfirm("Hapus Kenangan?", "Yakin ingin menghapus cerita ini? Data tidak bisa dikembalikan.", () => {
                 window.diaryData = window.diaryData.filter(d => d.id !== id);
-                try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
                 
+                // Hapus dari semua cadangan
+                try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
                 if(window.db) {
-                    const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                    tx.objectStore("ceritaStore").delete(id);
+                    try {
+                        const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                        tx.objectStore("ceritaStore").delete(id);
+                    } catch(err) {}
                 }
                 
                 renderDiary();
@@ -454,8 +495,8 @@
             if(tabTulis) tabTulis.click();
         };
 
-        // EKSEKUSI UTAMA
-        initDB();
+        // JALANKAN PROGRAM RECOVERY & INIT APP
+        initApp();
     })();
     </script>
 </body>
