@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruang Cerita</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Quicksand:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header id="mainHeader" class="glowing-border">
+            <div class="header-content" id="headerContent">
+                <h1 class="shimmer-text">Ruang Cerita</h1>
+                <div class="header-actions">
+                    <button id="searchBtn" class="icon-btn" title="Cari Cerita"><i class="fas fa-search"></i></button>
+                    <button id="themeToggle" class="icon-btn" title="Ganti Tema">🌙</button>
+                </div>
+            </div>
+            <div class="search-overlay" id="searchOverlay">
+                <input type="text" id="searchInput" placeholder="Cari momen, lokasi, atau kategori...">
+                <button id="closeSearchBtn" class="icon-btn close-btn"><i class="fas fa-times"></i></button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- TAB BERANDA -->
+            <section id="tab-beranda" class="tab-pane active">
+                <!-- Dropdown Filter Bulan/Tahun DIHAPUS sesuai permintaan -->
+                
+                <div id="diaryEntriesContainer" class="entries-grid"></div>
+            </section>
+
+            <!-- TAB TULIS CERITA -->
+            <section id="tab-tulis" class="tab-pane">
+                <div class="card glowing-card form-card">
+                    <h2 id="formTitle"><i class="fas fa-pen-nib"></i> Tulis Cerita Hari Ini</h2>
+                    <form id="diaryForm">
+                        
+                        <!-- WAKTU & TANGGAL (Diubah ke model Kalender dan Jam) -->
+                        <div class="form-group">
+                            <label>Waktu & Tanggal</label>
+                            <div class="datetime-dropdowns" style="display: flex; gap: 10px;">
+                                <input type="date" id="tgl_input" class="glowing-input" required>
+                                <input type="time" id="jam_input" class="glowing-input" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="kategori">Kategori Momen</label>
+                            <select id="kategori" class="glowing-input">
+                                <option value="📝 Harian">📝 Harian</option>
+                                <option value="💡 Ide">💡 Ide</option>
+                                <option value="✈️ Liburan">✈️ Liburan</option>
+                                <option value="🏖️ Pantai">🏖️ Pantai</option>
+                                <option value="❤️ Asmara">❤️ Asmara</option>
+                                <option value="💼 Pekerjaan">💼 Pekerjaan</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="lokasi">Lokasi</label>
+                            <input type="text" id="lokasi" class="glowing-input" placeholder="Cth: Pantai Kuta, Kafe Pinggir Laut">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="catatan">Isi Catatan</label>
+                            <textarea id="catatan" class="glowing-input" placeholder="Bagaimana harimu berjalan? Dengar deburan ombaknya..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tambahkan Foto Momen</label>
+                            <div class="file-upload-wrapper glowing-border">
+                                <span id="uploadPlaceholder"><i class="fas fa-camera"></i> Klik untuk Pilih Foto</span>
+                                <input type="file" id="foto" accept="image/*">
+                                <img id="imgPreview" alt="Preview Foto">
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="btnSubmit">Simpan Momen</button>
+                            <button type="button" class="btn btn-secondary" id="btnCancel" style="display:none;">Batal Edit</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- NAVIGASI BAWAH & FOOTER -->
+        <div class="bottom-fixed-wrapper">
+            <nav class="bottom-nav glowing-border-top">
+                <button class="nav-btn active" data-target="tab-beranda">
+                    <i class="fas fa-water"></i> <span>Beranda</span>
+                </button>
+                <button class="nav-btn" data-target="tab-tulis">
+                    <i class="fas fa-feather-alt"></i> <span>Tulis Cerita</span>
+                </button>
+            </nav>
+            <footer>
+                &copy; 2026 Aplikasi Ruang Cerita. All Rights Reserved. Powered by Arta Fortuna.
+            </footer>
+        </div>
+    </div>
+
+    <!-- MODAL LIGHTBOX FOTO -->
+    <div id="diaryImageModal" class="custom-modal lightbox">
+        <button class="close-modal-btn" id="closeLightboxBtn"><i class="fas fa-times"></i></button>
+        <div class="lightbox-content">
+            <img id="fullScreenImg" src="" alt="Full View Momen">
+        </div>
+    </div>
+
+    <!-- MODAL CUSTOM ALERT (TEMA WEBSITE) -->
+    <div id="customAlert" class="custom-modal custom-dialog">
+        <div class="dialog-card glowing-card">
+            <div class="dialog-icon text-primary"><i class="fas fa-info-circle"></i></div>
+            <h3 id="alertTitle">Informasi</h3>
+            <p id="alertMessage"></p>
+            <button id="alertOkBtn" class="btn btn-primary">Mengerti</button>
+        </div>
+    </div>
+
+    <!-- MODAL CUSTOM CONFIRM (TEMA WEBSITE) -->
+    <div id="customConfirm" class="custom-modal custom-dialog">
+        <div class="dialog-card glowing-card warning-card">
+            <div class="dialog-icon text-danger"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 id="confirmTitle">Konfirmasi</h3>
+            <p id="confirmMessage"></p>
+            <div class="dialog-actions">
+                <button id="confirmCancelBtn" class="btn btn-secondary">Batal</button>
+                <button id="confirmOkBtn" class="btn btn-danger">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT UTAMA -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let diaryData = [];
+        let editId = null;
+        let base64ImageStr = "";
+
+        // 1. TEMA DARK/LIGHT MODE
+        const html = document.documentElement;
+        const themeToggle = document.getElementById('themeToggle');
+        
+        let savedTheme = 'light';
+        try { savedTheme = localStorage.getItem('ruangcerita_theme') || 'light'; } catch(e) {}
+        html.setAttribute('data-theme', savedTheme);
+        themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            html.setAttribute('data-theme', newTheme);
+            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            try { localStorage.setItem('ruangcerita_theme', newTheme); } catch(e) {}
+        });
+
+        // 2. NAVIGASI TABS
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.getAttribute('data-target')).classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // 3. PENCARIAN (SEARCH)
+        const searchBtn = document.getElementById('searchBtn');
+        const searchOverlay = document.getElementById('searchOverlay');
+        const closeSearchBtn = document.getElementById('closeSearchBtn');
+        const searchInput = document.getElementById('searchInput');
+
+        searchBtn.addEventListener('click', () => searchOverlay.classList.add('active'));
+        closeSearchBtn.addEventListener('click', () => {
+            searchOverlay.classList.remove('active');
+            searchInput.value = '';
+            renderDiary();
+        });
+        searchInput.addEventListener('input', renderDiary);
+
+        // 4. SET DEFAULT TANGGAL & JAM KE WAKTU SEKARANG
+        const setDateTimeToNow = () => {
+            const now = new Date();
+            const tglInput = document.getElementById('tgl_input');
+            const jamInput = document.getElementById('jam_input');
+            if(tglInput && jamInput) {
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                tglInput.value = `${y}-${m}-${d}`;
+
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                jamInput.value = `${hh}:${mm}`;
+            }
+        };
+        setDateTimeToNow();
+
+        // 5. CUSTOM POPUP (ALERT & CONFIRM) BERTEMA WEBSITE
+        window.showAlert = (title, message) => {
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('customAlert').classList.add('show');
+        };
+        document.getElementById('alertOkBtn').addEventListener('click', () => {
+            document.getElementById('customAlert').classList.remove('show');
+        });
+
+        window.showConfirm = (title, message, onConfirm) => {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            const confirmModal = document.getElementById('customConfirm');
+            confirmModal.classList.add('show');
+            
+            const okBtn = document.getElementById('confirmOkBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+            
+            const newOkBtn = okBtn.cloneNode(true);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+            
+            newOkBtn.addEventListener('click', () => { 
+                confirmModal.classList.remove('show'); 
+                if (onConfirm) onConfirm(); 
+            });
+            newCancelBtn.addEventListener('click', () => confirmModal.classList.remove('show'));
+        };
+
+        // 6. UPLOAD FOTO
+        const fotoInput = document.getElementById('foto');
+        const imgPreview = document.getElementById('imgPreview');
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+
+        if(fotoInput) {
+            fotoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    base64ImageStr = event.target.result;
+                    imgPreview.src = base64ImageStr;
+                    imgPreview.style.display = 'block';
+                    uploadPlaceholder.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // LIGHTBOX FOTO FULLSCREEN
+        window.openLightbox = (src) => {
+            document.getElementById('fullScreenImg').src = src;
+            document.getElementById('diaryImageModal').classList.add('show');
+        };
+        document.getElementById('closeLightboxBtn').addEventListener('click', () => {
+            document.getElementById('diaryImageModal').classList.remove('show');
+        });
+
+        // 7. INDEXED DB (PENYIMPANAN AMAN)
+        const dbName = "RuangCeritaDB_Final";
+        let db;
+
+        const initDB = () => {
+            const request = indexedDB.open(dbName, 1);
+            request.onupgradeneeded = (e) => {
+                db = e.target.result;
+                if (!db.objectStoreNames.contains("ceritaStore")) {
+                    db.createObjectStore("ceritaStore", { keyPath: "id" });
+                }
+            };
+            request.onsuccess = (e) => {
+                db = e.target.result;
+                
+                // Migrasi data lama dari LocalStorage
+                const oldData = localStorage.getItem('diary_entries');
+                if (oldData) {
+                    try {
+                        const parsed = JSON.parse(oldData);
+                        const tx = db.transaction(["ceritaStore"], "readwrite");
+                        const store = tx.objectStore("ceritaStore");
+                        parsed.forEach(item => store.put(item));
+                        tx.oncomplete = () => {
+                            localStorage.removeItem('diary_entries');
+                            loadDataFromDB();
+                        };
+                    } catch(err) { loadDataFromDB(); }
+                } else {
+                    loadDataFromDB();
+                }
+            };
+        };
+
+        const loadDataFromDB = () => {
+            const tx = db.transaction(["ceritaStore"], "readonly");
+            const store = tx.objectStore("ceritaStore");
+            const request = store.getAll();
+            request.onsuccess = () => {
+                diaryData = request.result.sort((a, b) => new Date(b.waktu) - new Date(a.waktu));
+                renderDiary();
+            };
+        };
+
+        const saveDataToDB = (data, isUpdate) => {
+            const tx = db.transaction(["ceritaStore"], "readwrite");
+            const store = tx.objectStore("ceritaStore");
+            store.put(data);
+            tx.oncomplete = () => {
+                showAlert("Berhasil", isUpdate ? "Cerita berhasil diperbarui!" : "Momen barumu telah disimpan!");
+                loadDataFromDB();
+            };
+        };
+
+        // 8. HAPUS & EDIT DATA
+        window.deleteEntry = (id) => {
+            showConfirm("Hapus Kenangan?", "Yakin ingin menghapus cerita ini? Data tidak bisa dikembalikan.", () => {
+                const tx = db.transaction(["ceritaStore"], "readwrite");
+                const store = tx.objectStore("ceritaStore");
+                store.delete(id);
+                tx.oncomplete = () => {
+                    showAlert("Terhapus", "Kenangan berhasil dihapus.");
+                    loadDataFromDB();
+                    if(editId === id) resetFormState();
+                };
+            });
+        };
+
+        window.editEntry = (id) => {
+            const item = diaryData.find(d => d.id === id);
+            if (!item) return;
+
+            // Set Tanggal & Jam
+            try {
+                const parts = item.waktu.split('T');
+                document.getElementById('tgl_input').value = parts[0];
+                document.getElementById('jam_input').value = parts[1].substring(0,5);
+            } catch(e) { setDateTimeToNow(); }
+
+            document.getElementById('kategori').value = item.kategori;
+            document.getElementById('lokasi').value = item.lokasi || '';
+            document.getElementById('catatan').value = item.catatan;
+            
+            if (item.foto) {
+                base64ImageStr = item.foto;
+                imgPreview.src = item.foto;
+                imgPreview.style.display = 'block';
+                uploadPlaceholder.style.display = 'none';
+            } else {
+                base64ImageStr = "";
+                imgPreview.src = "";
+                imgPreview.style.display = 'none';
+                uploadPlaceholder.style.display = 'block';
+            }
+
+            editId = id;
+            document.getElementById('formTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Momen Cerita';
+            document.getElementById('btnSubmit').textContent = "Perbarui Cerita";
+            document.getElementById('btnCancel').style.display = "block";
+            
+            document.querySelector('[data-target="tab-tulis"]').click();
+        };
+
+        // 9. RENDER DATA KE BERANDA
+        const renderDiary = () => {
+            const container = document.getElementById('diaryEntriesContainer');
+            if(!container) return;
+            container.innerHTML = '';
+
+            const searchQuery = searchInput.value.toLowerCase();
+            
+            const filteredData = diaryData.filter(item => {
+                const note = item.catatan ? item.catatan.toLowerCase() : "";
+                const loc = item.lokasi ? item.lokasi.toLowerCase() : "";
+                const cat = item.kategori ? item.kategori.toLowerCase() : "";
+                return note.includes(searchQuery) || loc.includes(searchQuery) || cat.includes(searchQuery);
+            });
+
+            if (filteredData.length === 0) {
+                container.innerHTML = `
+                    <div class="card glowing-card" style="text-align:center; grid-column: 1 / -1; padding:30px;">
+                        <i class="fas fa-folder-open" style="font-size:2.5rem; color:var(--text-muted); margin-bottom:10px;"></i>
+                        <p>Belum ada cerita. Yuk tulis momenmu!</p>
+                    </div>`;
+                return;
+            }
+
+            filteredData.forEach(item => {
+                let tanggalCantik = item.waktu;
+                try {
+                    tanggalCantik = new Date(item.waktu).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                } catch(e){}
+
+                const div = document.createElement('div');
+                div.className = 'entry-card';
+                
+                // TOMBOL EDIT DIMASUKKAN KEMBALI DI SINI
+                div.innerHTML = `
+                    <div class="entry-header">
+                        <span class="entry-meta"><i class="far fa-calendar-alt"></i> ${tanggalCantik}</span>
+                        <span class="badge">${item.kategori || ''}</span>
+                    </div>
+                    ${item.foto ? `<img src="${item.foto}" class="entry-image" onclick="openLightbox('${item.foto}')">` : ''}
+                    <div class="entry-text">${item.catatan || ''}</div>
+                    ${item.lokasi ? `<div class="entry-location"><i class="fas fa-map-marker-alt"></i> ${item.lokasi}</div>` : ''}
+                    <div class="entry-actions">
+                        <button class="btn-sm" onclick="editEntry(${item.id})"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn-sm delete" onclick="deleteEntry(${item.id})"><i class="fas fa-trash"></i> Hapus</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        };
+
+        // 10. SUBMIT FORM
+        const form = document.getElementById('diaryForm');
+        if(form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const tgl = document.getElementById('tgl_input').value;
+                const jam = document.getElementById('jam_input').value;
+                const strWaktu = `${tgl}T${jam}`;
+
+                const dataMomen = {
+                    id: editId ? editId : Date.now(),
+                    waktu: strWaktu,
+                    kategori: document.getElementById('kategori').value,
+                    lokasi: document.getElementById('lokasi').value,
+                    catatan: document.getElementById('catatan').value,
+                    foto: base64ImageStr
+                };
+
+                saveDataToDB(dataMomen, !!editId);
+                resetFormState();
+                document.querySelector('[data-target="tab-beranda"]').click();
+            });
+        }
+
+        const resetFormState = () => {
+            editId = null;
+            if(form) form.reset();
+            document.getElementById('formTitle').innerHTML = '<i class="fas fa-pen-nib"></i> Tulis Cerita Hari Ini';
+            document.getElementById('btnSubmit').textContent = "Simpan Momen";
+            document.getElementById('btnCancel').style.display = "none";
+            base64ImageStr = "";
+            imgPreview.src = "";
+            imgPreview.style.display = 'none';
+            uploadPlaceholder.style.display = 'block';
+            setDateTimeToNow();
+        };
+
+        document.getElementById('btnCancel').addEventListener('click', () => {
+            resetFormState();
+            document.querySelector('[data-target="tab-beranda"]').click();
+        });
+
+        // Jalankan Database
+        initDB();
+    });
+    </script>
+</body>
+</html>
