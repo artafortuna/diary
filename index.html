@@ -135,285 +135,146 @@
         </div>
     </div>
 
-    <!-- SCRIPT UTAMA FULL ANTI-CRASH -->
+    <!-- SCRIPT UTAMA FULL ANTI-CRASH & DATA RECOVERY -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let diaryData = [];
-        let editId = null;
-        let base64ImageStr = "";
-        window.db = null; // Akses database global
+    (function() {
+        // STATE UTAMA
+        window.diaryData = [];
+        window.editId = null;
+        window.base64ImageStr = "";
+        window.db = null;
 
         // 1. TEMA DARK/LIGHT MODE
         const html = document.documentElement;
         const themeToggle = document.getElementById('themeToggle');
-        
         let savedTheme = 'light';
         try { savedTheme = localStorage.getItem('ruangcerita_theme') || 'light'; } catch(e) {}
         html.setAttribute('data-theme', savedTheme);
-        themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            html.setAttribute('data-theme', newTheme);
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-            try { localStorage.setItem('ruangcerita_theme', newTheme); } catch(e) {}
-        });
+        if(themeToggle) {
+            themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+            themeToggle.addEventListener('click', () => {
+                const newTheme = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+                html.setAttribute('data-theme', newTheme);
+                themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+                try { localStorage.setItem('ruangcerita_theme', newTheme); } catch(e) {}
+            });
+        }
 
         // 2. NAVIGASI TABS
-        document.querySelectorAll('.nav-btn').forEach(btn => {
+        const navBtns = document.querySelectorAll('.nav-btn');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        navBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                navBtns.forEach(b => b.classList.remove('active'));
+                tabPanes.forEach(p => p.classList.remove('active'));
                 this.classList.add('active');
-                document.getElementById(this.getAttribute('data-target')).classList.add('active');
+                const target = document.getElementById(this.getAttribute('data-target'));
+                if(target) target.classList.add('active');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         });
 
-        // 3. PENCARIAN (SEARCH)
-        const searchBtn = document.getElementById('searchBtn');
-        const searchOverlay = document.getElementById('searchOverlay');
-        const closeSearchBtn = document.getElementById('closeSearchBtn');
-        const searchInput = document.getElementById('searchInput');
-
-        searchBtn.addEventListener('click', () => searchOverlay.classList.add('active'));
-        closeSearchBtn.addEventListener('click', () => {
-            searchOverlay.classList.remove('active');
-            searchInput.value = '';
-            renderDiary();
-        });
-        searchInput.addEventListener('input', renderDiary);
-
-        // 4. SET DEFAULT TANGGAL & JAM KE WAKTU SEKARANG
+        // 3. SET DEFAULT TANGGAL & JAM KE WAKTU SEKARANG
         const setDateTimeToNow = () => {
-            const now = new Date();
             const tglInput = document.getElementById('tgl_input');
             const jamInput = document.getElementById('jam_input');
             if(tglInput && jamInput) {
+                const now = new Date();
                 const y = now.getFullYear();
                 const m = String(now.getMonth() + 1).padStart(2, '0');
                 const d = String(now.getDate()).padStart(2, '0');
                 tglInput.value = `${y}-${m}-${d}`;
-
-                const hh = String(now.getHours()).padStart(2, '0');
-                const mm = String(now.getMinutes()).padStart(2, '0');
-                jamInput.value = `${hh}:${mm}`;
+                jamInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
             }
         };
         setDateTimeToNow();
 
-        // 5. CUSTOM POPUP (ALERT & CONFIRM) BERTEMA WEBSITE
+        // 4. CUSTOM POPUP (ALERT & CONFIRM) BERTEMA WEBSITE
         window.showAlert = (title, message) => {
-            document.getElementById('alertTitle').textContent = title;
-            document.getElementById('alertMessage').textContent = message;
-            document.getElementById('customAlert').classList.add('show');
+            const alertEl = document.getElementById('customAlert');
+            if(alertEl) {
+                document.getElementById('alertTitle').textContent = title;
+                document.getElementById('alertMessage').textContent = message;
+                alertEl.classList.add('show');
+            } else { alert(message); } // Fallback aman
         };
-        document.getElementById('alertOkBtn').addEventListener('click', () => {
-            document.getElementById('customAlert').classList.remove('show');
-        });
+        const alertOkBtn = document.getElementById('alertOkBtn');
+        if(alertOkBtn) alertOkBtn.addEventListener('click', () => document.getElementById('customAlert').classList.remove('show'));
 
         window.showConfirm = (title, message, onConfirm) => {
+            const confirmModal = document.getElementById('customConfirm');
+            if(!confirmModal) { if(confirm(message)) onConfirm(); return; }
+            
             document.getElementById('confirmTitle').textContent = title;
             document.getElementById('confirmMessage').textContent = message;
-            const confirmModal = document.getElementById('customConfirm');
             confirmModal.classList.add('show');
             
             const okBtn = document.getElementById('confirmOkBtn');
             const cancelBtn = document.getElementById('confirmCancelBtn');
-            
             const newOkBtn = okBtn.cloneNode(true);
             const newCancelBtn = cancelBtn.cloneNode(true);
             okBtn.parentNode.replaceChild(newOkBtn, okBtn);
             cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
             
-            newOkBtn.addEventListener('click', () => { 
-                confirmModal.classList.remove('show'); 
-                if (onConfirm) onConfirm(); 
-            });
+            newOkBtn.addEventListener('click', () => { confirmModal.classList.remove('show'); onConfirm(); });
             newCancelBtn.addEventListener('click', () => confirmModal.classList.remove('show'));
         };
 
-        // 6. UPLOAD FOTO DENGAN KOMPRESI OTOMATIS (Anti Crash System)
+        // 5. UPLOAD FOTO (ANTI CRASH)
         const fotoInput = document.getElementById('foto');
         const imgPreview = document.getElementById('imgPreview');
         const uploadPlaceholder = document.getElementById('uploadPlaceholder');
-
         if(fotoInput) {
             fotoInput.addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
-
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    const img = new Image();
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800; // Kompres ukuran agar tak membebani sistem
-                        const MAX_HEIGHT = 800;
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                        } else {
-                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // Konversi ke base64 dengan kompresi 70%
-                        base64ImageStr = canvas.toDataURL('image/jpeg', 0.7); 
-                        imgPreview.src = base64ImageStr;
+                    window.base64ImageStr = event.target.result;
+                    if(imgPreview) {
+                        imgPreview.src = window.base64ImageStr;
                         imgPreview.style.display = 'block';
-                        uploadPlaceholder.style.display = 'none';
                     }
-                    img.src = event.target.result;
+                    if(uploadPlaceholder) uploadPlaceholder.style.display = 'none';
                 };
                 reader.readAsDataURL(file);
             });
         }
 
-        // LIGHTBOX FOTO FULLSCREEN
+        // LIGHTBOX FOTO
         window.openLightbox = (src) => {
-            document.getElementById('fullScreenImg').src = src;
-            document.getElementById('diaryImageModal').classList.add('show');
+            const modal = document.getElementById('diaryImageModal');
+            const fsImg = document.getElementById('fullScreenImg');
+            if(modal && fsImg) { fsImg.src = src; modal.classList.add('show'); }
         };
-        document.getElementById('closeLightboxBtn').addEventListener('click', () => {
-            document.getElementById('diaryImageModal').classList.remove('show');
+        const closeLightboxBtn = document.getElementById('closeLightboxBtn');
+        if(closeLightboxBtn) closeLightboxBtn.addEventListener('click', () => document.getElementById('diaryImageModal').classList.remove('show'));
+
+        // 6. PENCARIAN (SEARCH)
+        const searchBtn = document.getElementById('searchBtn');
+        const searchOverlay = document.getElementById('searchOverlay');
+        const closeSearchBtn = document.getElementById('closeSearchBtn');
+        const searchInput = document.getElementById('searchInput');
+        if(searchBtn && searchOverlay) searchBtn.addEventListener('click', () => searchOverlay.classList.add('active'));
+        if(closeSearchBtn && searchOverlay) closeSearchBtn.addEventListener('click', () => { 
+            searchOverlay.classList.remove('active'); 
+            if(searchInput) searchInput.value = ''; 
+            renderDiary(); 
         });
+        if(searchInput) searchInput.addEventListener('input', () => renderDiary());
 
-        // 7. DATABASE & PENYELAMAT DATA LAMA
-        // KITA KEMBALIKAN NAMA DATABASE KE VERSI PERTAMA AGAR DATA LAMA MUNCUL!
-        const dbName = "RuangCeritaDB"; 
-
-        const initDB = () => {
-            const request = indexedDB.open(dbName, 1);
-            
-            request.onupgradeneeded = (e) => {
-                window.db = e.target.result;
-                if (!window.db.objectStoreNames.contains("ceritaStore")) {
-                    window.db.createObjectStore("ceritaStore", { keyPath: "id" });
-                }
-            };
-            
-            request.onsuccess = (e) => {
-                window.db = e.target.result;
-                
-                // Cari apakah ada data lama yang nyangkut di LocalStorage
-                const oldData = localStorage.getItem('diary_entries');
-                if (oldData) {
-                    try {
-                        const parsed = JSON.parse(oldData);
-                        const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                        const store = tx.objectStore("ceritaStore");
-                        parsed.forEach(item => store.put(item));
-                        tx.oncomplete = () => {
-                            localStorage.removeItem('diary_entries');
-                            loadDataFromDB();
-                        };
-                    } catch(err) { loadDataFromDB(); }
-                } else {
-                    loadDataFromDB();
-                }
-            };
-
-            request.onerror = (e) => {
-                console.error("Gagal memuat Database:", e);
-                showAlert("Peringatan", "Browser kamu memblokir sistem penyimpanan utama. Memuat mode dasar...");
-            };
-        };
-
-        const loadDataFromDB = () => {
-            if(!window.db) return;
-            const tx = window.db.transaction(["ceritaStore"], "readonly");
-            const store = tx.objectStore("ceritaStore");
-            const request = store.getAll();
-            
-            request.onsuccess = () => {
-                diaryData = request.result.sort((a, b) => new Date(b.waktu) - new Date(a.waktu));
-                renderDiary();
-            };
-        };
-
-        const saveDataToDB = (data, isUpdate) => {
-            try {
-                const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                const store = tx.objectStore("ceritaStore");
-                store.put(data);
-                tx.oncomplete = () => {
-                    showAlert("Berhasil", isUpdate ? "Cerita berhasil diperbarui!" : "Momen barumu telah disimpan!");
-                    loadDataFromDB();
-                };
-            } catch (err) {
-                showAlert("Sistem Error", "Gagal menyimpan data: " + err.message);
-            }
-        };
-
-        // 8. HAPUS & EDIT DATA
-        window.deleteEntry = (id) => {
-            showConfirm("Hapus Kenangan?", "Yakin ingin menghapus cerita ini? Data tidak bisa dikembalikan.", () => {
-                const tx = window.db.transaction(["ceritaStore"], "readwrite");
-                const store = tx.objectStore("ceritaStore");
-                store.delete(id);
-                tx.oncomplete = () => {
-                    showAlert("Terhapus", "Kenangan berhasil dihapus.");
-                    loadDataFromDB();
-                    if(editId === id) resetFormState();
-                };
-            });
-        };
-
-        window.editEntry = (id) => {
-            const item = diaryData.find(d => d.id === id);
-            if (!item) return;
-
-            try {
-                const parts = item.waktu.split('T');
-                document.getElementById('tgl_input').value = parts[0];
-                document.getElementById('jam_input').value = parts[1].substring(0,5);
-            } catch(e) { setDateTimeToNow(); }
-
-            document.getElementById('kategori').value = item.kategori;
-            document.getElementById('lokasi').value = item.lokasi || '';
-            document.getElementById('catatan').value = item.catatan;
-            
-            if (item.foto) {
-                base64ImageStr = item.foto;
-                imgPreview.src = item.foto;
-                imgPreview.style.display = 'block';
-                uploadPlaceholder.style.display = 'none';
-            } else {
-                base64ImageStr = "";
-                imgPreview.src = "";
-                imgPreview.style.display = 'none';
-                uploadPlaceholder.style.display = 'block';
-            }
-
-            editId = id;
-            document.getElementById('formTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Momen Cerita';
-            document.getElementById('btnSubmit').textContent = "Perbarui Cerita";
-            document.getElementById('btnCancel').style.display = "block";
-            
-            document.querySelector('[data-target="tab-tulis"]').click();
-        };
-
-        // 9. RENDER DATA KE BERANDA
+        // 7. RENDER DATA KE BERANDA
         const renderDiary = () => {
             const container = document.getElementById('diaryEntriesContainer');
             if(!container) return;
             container.innerHTML = '';
-
-            const searchQuery = searchInput.value.toLowerCase();
             
-            const filteredData = diaryData.filter(item => {
+            const query = searchInput ? searchInput.value.toLowerCase() : "";
+            const filteredData = window.diaryData.filter(item => {
                 const note = item.catatan ? item.catatan.toLowerCase() : "";
                 const loc = item.lokasi ? item.lokasi.toLowerCase() : "";
                 const cat = item.kategori ? item.kategori.toLowerCase() : "";
-                return note.includes(searchQuery) || loc.includes(searchQuery) || cat.includes(searchQuery);
+                return note.includes(query) || loc.includes(query) || cat.includes(query);
             });
 
             if (filteredData.length === 0) {
@@ -427,22 +288,19 @@
 
             filteredData.forEach(item => {
                 let tanggalCantik = item.waktu;
-                try {
-                    tanggalCantik = new Date(item.waktu).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                } catch(e){}
+                try { tanggalCantik = new Date(item.waktu).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch(e){}
 
                 const div = document.createElement('div');
                 div.className = 'entry-card';
-                
                 div.innerHTML = `
                     <div class="entry-header">
                         <span class="entry-meta"><i class="far fa-calendar-alt"></i> ${tanggalCantik}</span>
                         <span class="badge">${item.kategori || ''}</span>
                     </div>
-                    ${item.foto ? `<img src="${item.foto}" class="entry-image" onclick="openLightbox('${item.foto}')">` : ''}
-                    <div class="entry-text">${item.catatan || ''}</div>
-                    ${item.lokasi ? `<div class="entry-location"><i class="fas fa-map-marker-alt"></i> ${item.lokasi}</div>` : ''}
-                    <div class="entry-actions">
+                    ${item.foto ? `<img src="${item.foto}" class="entry-image" onclick="openLightbox('${item.foto}')" style="object-fit:cover; height:120px; border-radius:8px; margin-bottom:10px; cursor:zoom-in;">` : ''}
+                    <div class="entry-text" style="font-size:0.95rem; margin-bottom:10px; white-space:pre-wrap;">${item.catatan || ''}</div>
+                    ${item.lokasi ? `<div class="entry-location" style="font-size:0.78rem; color:var(--secondary); margin-bottom:10px;"><i class="fas fa-map-marker-alt"></i> ${item.lokasi}</div>` : ''}
+                    <div class="entry-actions" style="display:flex; justify-content:flex-end; gap:8px; border-top:1px dashed var(--border-color); padding-top:10px;">
                         <button class="btn-sm" onclick="editEntry(${item.id})"><i class="fas fa-edit"></i> Edit</button>
                         <button class="btn-sm delete" onclick="deleteEntry(${item.id})"><i class="fas fa-trash"></i> Hapus</button>
                     </div>
@@ -451,56 +309,154 @@
             });
         };
 
-        // 10. SUBMIT FORM (DENGAN PROTEKSI ERROR)
+        // 8. DATABASE & PENYELAMAT DATA LAMA (GANDA)
+        const initDB = () => {
+            const req = indexedDB.open("RuangCeritaDB", 3); // Paksa buat db jika stuck
+            req.onupgradeneeded = (e) => {
+                window.db = e.target.result;
+                if (!window.db.objectStoreNames.contains("ceritaStore")) {
+                    window.db.createObjectStore("ceritaStore", { keyPath: "id" });
+                }
+            };
+            req.onsuccess = (e) => {
+                window.db = e.target.result;
+                
+                // SELAMATKAN SEMUA DATA LAMA DARI LOCALSTORAGE
+                let localData = [];
+                try { localData = JSON.parse(localStorage.getItem('diary_entries')) || []; } catch(err){}
+                
+                const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                const store = tx.objectStore("ceritaStore");
+                
+                // Suntik data lama ke IndexedDB
+                localData.forEach(item => store.put(item));
+                
+                const getReq = store.getAll();
+                getReq.onsuccess = () => {
+                    window.diaryData = (getReq.result || []).sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
+                    // Tulis balik ke LocalStorage sebagai Backup Permanen!
+                    try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
+                    renderDiary();
+                };
+            };
+            req.onerror = () => {
+                // JIKA INDEXEDDB DIBLOKIR BROWSER, PAKAI LOCALSTORAGE SAJA
+                try {
+                    window.diaryData = JSON.parse(localStorage.getItem('diary_entries')) || [];
+                    window.diaryData.sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
+                    renderDiary();
+                } catch(e){}
+            };
+        };
+
+        // 9. SUBMIT FORM
         const form = document.getElementById('diaryForm');
         if(form) {
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                const tgl = document.getElementById('tgl_input').value;
+                const jam = document.getElementById('jam_input').value;
+                const dataMomen = {
+                    id: window.editId ? window.editId : Date.now(),
+                    waktu: `${tgl}T${jam}`,
+                    kategori: document.getElementById('kategori').value,
+                    lokasi: document.getElementById('lokasi').value,
+                    catatan: document.getElementById('catatan').value,
+                    foto: window.base64ImageStr
+                };
+
+                // Update Array Memory
+                window.diaryData = window.diaryData.filter(d => d.id !== dataMomen.id);
+                window.diaryData.push(dataMomen);
+                window.diaryData.sort((a,b) => new Date(b.waktu) - new Date(a.waktu));
                 
-                try {
-                    const tgl = document.getElementById('tgl_input').value;
-                    const jam = document.getElementById('jam_input').value;
-                    const strWaktu = `${tgl}T${jam}`;
+                // BACKUP 1: Simpan ke LocalStorage
+                try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
 
-                    const dataMomen = {
-                        id: editId ? editId : Date.now(),
-                        waktu: strWaktu,
-                        kategori: document.getElementById('kategori').value,
-                        lokasi: document.getElementById('lokasi').value,
-                        catatan: document.getElementById('catatan').value,
-                        foto: base64ImageStr
-                    };
-
-                    saveDataToDB(dataMomen, !!editId);
-                    resetFormState();
-                    document.querySelector('[data-target="tab-beranda"]').click();
-                } catch (error) {
-                    showAlert("Gagal Menyimpan", "Terjadi masalah: " + error.message);
+                // BACKUP 2: Simpan ke IndexedDB
+                if(window.db) {
+                    const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                    tx.objectStore("ceritaStore").put(dataMomen);
                 }
+
+                resetForm();
+                const tabBeranda = document.querySelector('[data-target="tab-beranda"]');
+                if(tabBeranda) tabBeranda.click();
+                renderDiary();
+                showAlert("Berhasil", "Momen tersimpan dengan aman!");
             });
         }
 
-        const resetFormState = () => {
-            editId = null;
+        const resetForm = () => {
+            window.editId = null;
             if(form) form.reset();
-            document.getElementById('formTitle').innerHTML = '<i class="fas fa-pen-nib"></i> Tulis Cerita Hari Ini';
-            document.getElementById('btnSubmit').textContent = "Simpan Momen";
-            document.getElementById('btnCancel').style.display = "none";
-            base64ImageStr = "";
-            imgPreview.src = "";
-            imgPreview.style.display = 'none';
-            uploadPlaceholder.style.display = 'block';
+            const formTitle = document.getElementById('formTitle');
+            if(formTitle) formTitle.innerHTML = '<i class="fas fa-pen-nib"></i> Tulis Cerita Hari Ini';
+            const btnSubmit = document.getElementById('btnSubmit');
+            if(btnSubmit) btnSubmit.textContent = "Simpan Momen";
+            const btnCancel = document.getElementById('btnCancel');
+            if(btnCancel) btnCancel.style.display = "none";
+            window.base64ImageStr = "";
+            if(imgPreview) { imgPreview.src = ""; imgPreview.style.display = 'none'; }
+            if(uploadPlaceholder) uploadPlaceholder.style.display = 'block';
             setDateTimeToNow();
         };
 
-        document.getElementById('btnCancel').addEventListener('click', () => {
-            resetFormState();
-            document.querySelector('[data-target="tab-beranda"]').click();
-        });
+        const btnCancel = document.getElementById('btnCancel');
+        if(btnCancel) btnCancel.addEventListener('click', () => { resetForm(); document.querySelector('[data-target="tab-beranda"]').click(); });
 
-        // Jalankan Database
+        window.deleteEntry = (id) => {
+            showConfirm("Hapus Kenangan?", "Yakin ingin menghapus cerita ini? Data tidak bisa dikembalikan.", () => {
+                window.diaryData = window.diaryData.filter(d => d.id !== id);
+                try { localStorage.setItem('diary_entries', JSON.stringify(window.diaryData)); } catch(err){}
+                
+                if(window.db) {
+                    const tx = window.db.transaction(["ceritaStore"], "readwrite");
+                    tx.objectStore("ceritaStore").delete(id);
+                }
+                
+                renderDiary();
+                if(window.editId === id) resetForm();
+                showAlert("Terhapus", "Kenangan berhasil dihapus.");
+            });
+        };
+
+        window.editEntry = (id) => {
+            const item = window.diaryData.find(d => d.id === id);
+            if (!item) return;
+
+            try {
+                const parts = item.waktu.split('T');
+                document.getElementById('tgl_input').value = parts[0];
+                document.getElementById('jam_input').value = parts[1].substring(0,5);
+            } catch(e) { setDateTimeToNow(); }
+
+            document.getElementById('kategori').value = item.kategori;
+            document.getElementById('lokasi').value = item.lokasi || '';
+            document.getElementById('catatan').value = item.catatan;
+            
+            if (item.foto) {
+                window.base64ImageStr = item.foto;
+                if(imgPreview) { imgPreview.src = item.foto; imgPreview.style.display = 'block'; }
+                if(uploadPlaceholder) uploadPlaceholder.style.display = 'none';
+            } else {
+                window.base64ImageStr = "";
+                if(imgPreview) { imgPreview.src = ""; imgPreview.style.display = 'none'; }
+                if(uploadPlaceholder) uploadPlaceholder.style.display = 'block';
+            }
+
+            window.editId = id;
+            document.getElementById('formTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Momen Cerita';
+            document.getElementById('btnSubmit').textContent = "Perbarui Cerita";
+            document.getElementById('btnCancel').style.display = "block";
+            
+            const tabTulis = document.querySelector('[data-target="tab-tulis"]');
+            if(tabTulis) tabTulis.click();
+        };
+
+        // EKSEKUSI UTAMA
         initDB();
-    });
+    })();
     </script>
 </body>
 </html>
